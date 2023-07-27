@@ -18,11 +18,12 @@ const web3Onboard = init({
     name: 'Web3-Onboard Demo',
     icon: '<svg>App Icon</svg>',
     description: 'A demo of Web3-Onboard.'
+  },
+  connect: {
+    autoConnectLastWallet: true
   }
 })
-  
-// const wallets2 = await web3Onboard.connectWallet()
-// console.log(wallets2)
+
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
