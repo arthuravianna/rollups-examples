@@ -1,5 +1,5 @@
 import AuctionCard from "@/components/auction_card";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Button from 'react-bootstrap/Button';
@@ -12,11 +12,14 @@ const loading_auction_list = <div className="d-flex justify-content-center">
     <span className="visually-hidden">Loading...</span>
   </Spinner>
 </div>
+
 const auction_limit = 6;  // number of auctions per page
 let inspect_url = "http://localhost:5005/inspect/";
+let auction_counter:number; // current number of auction exhibited on page
 
 function build_auction_list(offset: number, setFunction: Function) {
   let url = `${inspect_url}auctions?limit=${auction_limit}&offset=${offset}`
+  console.log(url)
 
   fetch(url, {method: 'GET',mode: 'cors',})
   .then((response) => {
@@ -24,12 +27,14 @@ function build_auction_list(offset: number, setFunction: Function) {
       let inspect_res = JSON.parse(inspect_res_str);
       let auctions = JSON.parse(ethers.utils.toUtf8String(inspect_res.reports[0].payload))
 
+      auction_counter = auctions.length;
+
       setFunction(
         <Row md={3}>
           {auctions.map((auction: any) => {
             return (
               <Col key={auction.id}>
-                <AuctionCard auction={auction}></AuctionCard>
+                <AuctionCard auction={auction} clickable={true}></AuctionCard>
               </Col>
             )
           })}
@@ -52,29 +57,50 @@ function build_auction_list(offset: number, setFunction: Function) {
 export default function AuctionList() {
   const [curr_offset, setOffset] = useState(0);
   const [list, setList] = useState(loading_auction_list);
+  const [disable_prev_btn, setDisablePrevBtn] = useState(true);
+  const [disable_next_btn, setDisableNextBtn] = useState(auction_counter < auction_limit? false: true);
+  
+  // build_auction_list on page load
+  useEffect(() => {build_auction_list(curr_offset, setList)}, [])
 
   function previous() {
     //setList(loading_auction_list)
-    setOffset(curr_offset - auction_limit);
-    //build_auction_list(curr_offset, setList);
+    let new_offset = curr_offset - auction_limit;
+    if (new_offset <= 0) {
+      new_offset = 0;
+      setDisablePrevBtn(true);
+    } else {
+      setDisablePrevBtn(false);
+    }
+    
+    build_auction_list(new_offset, setList);
+    setOffset(new_offset);
+    setDisableNextBtn(false);
   }
 
   function next() {
     //setList(loading_auction_list)
-    setOffset(curr_offset + auction_limit);
-    //build_auction_list(curr_offset, setList);
+    let new_offset = curr_offset + auction_limit;
+    if (auction_counter < auction_limit) {
+      setDisablePrevBtn(true);
+    } else {
+      setDisableNextBtn(false);
+    }
+    
+    build_auction_list(new_offset, setList);
+    setOffset(new_offset);
+    setDisablePrevBtn(false);
   }
 
-  build_auction_list(curr_offset, setList)
 
   return (
     <>
       {list}
 
       <div className="text-center">
-        <Button variant="outline-secondary" className="m-2" title="Previous" onClick={previous}><ChevronDoubleLeft/></Button>
+        <Button variant="outline-secondary" className="m-2" disabled={disable_prev_btn} title="Previous" onClick={previous}><ChevronDoubleLeft/></Button>
         <span>{(curr_offset/auction_limit) + 1}</span>
-        <Button variant="outline-secondary" className="m-2" title="Next" onClick={next}><ChevronDoubleRight/></Button>
+        <Button variant="outline-secondary" className="m-2" disabled={disable_next_btn} title="Next" onClick={next}><ChevronDoubleRight/></Button>
       </div>
 
     </>

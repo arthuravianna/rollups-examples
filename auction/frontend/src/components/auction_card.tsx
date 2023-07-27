@@ -17,9 +17,26 @@ interface AuctionInterface {
     //bids: Array<BidInterface>
 }
 
-export default function AuctionCard({auction}: {auction: AuctionInterface}) {
+export default function AuctionCard({auction, clickable}: {auction: AuctionInterface, clickable:boolean}) {
+  if (!auction) {
+    return;
+  }
+  
   const router = useRouter()
   let status_icon;
+  let card_class = "m-2";
+  let card_on_click = () => {}; // do nothing;
+  if (clickable) {
+    // add style class and onClick function
+    card_class = card_class + " clickable_card";
+    card_on_click = () => {
+      router.push({
+        pathname: '/auction/[id]',
+        query: { id: auction.id },
+      })
+    }
+  }
+  
   let highest_bid_author = "No one made a bid yet";
   let highest_bid = 0;
   let highest_bid_timestamp = "";
@@ -45,12 +62,7 @@ export default function AuctionCard({auction}: {auction: AuctionInterface}) {
 
 
   return (
-    <Card className='m-2 clickable_card' onClick={()=>{
-      router.push({
-        pathname: '/auction/[id]',
-        query: { id: auction.id },
-      })
-    }}>
+    <Card className={card_class} onClick={card_on_click}>
       <Card.Body>
         <Card.Title>{auction.title} {status_icon}</Card.Title>
 

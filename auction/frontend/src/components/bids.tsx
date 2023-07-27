@@ -7,6 +7,10 @@ interface BidInterface {
 }
 
 export default function Bids({bids}: {bids: Array<BidInterface>}) {
+    if (!bids) {
+        return;
+    }
+    
     return (
         <Table striped bordered hover>
             <thead>
