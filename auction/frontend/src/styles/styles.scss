@@ -13,3 +13,14 @@ body {
 .clickable_card:hover {
   border: 1px solid grey;
 }
+
+.form_label_size {
+  font-size: 12px;
+}
+
+.react-datepicker-wrapper,
+.react-datepicker__input-container,
+.react-datepicker__input-container input {
+  display: block;
+  width: 100%;
+}
