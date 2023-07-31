@@ -17,8 +17,8 @@ async function get_l2_balance(addr:string, erc20:string) {
     let url = `${inspect_url}balance/${addr}`
 
     let inspect_res = (await fetch(url, {method: 'GET',mode: 'cors'}));
-    let inspect_res_str = await inspect_res.text();
-    let inspect_json = JSON.parse(inspect_res_str);
+    let inspect_json = await inspect_res.json();
+    //let inspect_json = JSON.parse(inspect_res_str);
     let balances = JSON.parse(ethers.utils.toUtf8String(inspect_json.reports[0].payload));
 
     if (balances.erc20 === undefined) {
@@ -30,11 +30,18 @@ async function get_l2_balance(addr:string, erc20:string) {
 
 
 export default function Auction({auction}: {auction: any}) {
+    const [auction_card_fixed, setAuctionCardFixed] = useState(false);
     const [l2_balance, setL2Balance] = useState(0);
     const [bid_form, setBidForm] = useState(<></>);
     const [{ wallet, connecting }, connect, disconnect] = useConnectWallet();
     let bid_amount:number;
 
+    useEffect(() => {
+        // if scrollbar visible, set the auction card to be fixed
+        if (document.body.clientHeight > window.innerHeight) {
+            setAuctionCardFixed(true);
+        }
+    }, [document])
 
     useEffect(() => {
         if (wallet && auction) {
@@ -107,7 +114,7 @@ export default function Auction({auction}: {auction: any}) {
         <>
             <Row>
                 <Col md={4}>
-                    <div className='position-fixed'>
+                    <div className={auction_card_fixed? "position-fixed":""}>
                         <AuctionCard auction={auction} clickable={false}></AuctionCard>
                         {bid_form}
                     </div>
