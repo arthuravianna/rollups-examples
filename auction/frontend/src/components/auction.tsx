@@ -38,10 +38,10 @@ export default function Auction({auction}: {auction: any}) {
 
     useEffect(() => {
         // if scrollbar visible, set the auction card to be fixed
-        if (document.body.clientHeight > window.innerHeight) {
+        if (document && document.body.clientHeight > window.innerHeight) {
             setAuctionCardFixed(true);
         }
-    }, [document])
+    }, [])
 
     useEffect(() => {
         if (wallet && auction) {

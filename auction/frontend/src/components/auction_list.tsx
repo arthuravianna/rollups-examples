@@ -58,10 +58,15 @@ export default function AuctionList() {
   const [curr_offset, setOffset] = useState(0);
   const [list, setList] = useState(loading_auction_list);
   const [disable_prev_btn, setDisablePrevBtn] = useState(true);
-  const [disable_next_btn, setDisableNextBtn] = useState(auction_counter < auction_limit? false: true);
-  
+  const [disable_next_btn, setDisableNextBtn] = useState(false);
+
   // build_auction_list on page load
   useEffect(() => {build_auction_list(curr_offset, setList)}, [])
+
+  // disable or not the next btn
+  useEffect(() => {
+    auction_counter < auction_limit? setDisableNextBtn(true): setDisableNextBtn(false)
+  }, [auction_counter]);
 
   function previous() {
     //setList(loading_auction_list)
@@ -72,7 +77,7 @@ export default function AuctionList() {
     } else {
       setDisablePrevBtn(false);
     }
-    
+
     build_auction_list(new_offset, setList);
     setOffset(new_offset);
     setDisableNextBtn(false);
@@ -86,7 +91,7 @@ export default function AuctionList() {
     } else {
       setDisableNextBtn(false);
     }
-    
+
     build_auction_list(new_offset, setList);
     setOffset(new_offset);
     setDisablePrevBtn(false);
