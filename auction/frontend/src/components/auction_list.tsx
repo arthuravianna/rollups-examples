@@ -14,17 +14,15 @@ const loading_auction_list = <div className="d-flex justify-content-center">
 </div>
 
 const auction_limit = 6;  // number of auctions per page
-let inspect_url = "http://localhost:5005/inspect/";
 let auction_counter:number; // current number of auction exhibited on page
 
 function build_auction_list(offset: number, setFunction: Function) {
-  let url = `${inspect_url}auctions?limit=${auction_limit}&offset=${offset}`
+  let url = `${process.env.NEXT_PUBLIC_INSPECT_URL}/auctions?limit=${auction_limit}&offset=${offset}`
   console.log(url)
 
   fetch(url, {method: 'GET',mode: 'cors',})
   .then((response) => {
-    response.text().then((inspect_res_str) => {
-      let inspect_res = JSON.parse(inspect_res_str);
+    response.json().then((inspect_res) => {
       let auctions = JSON.parse(ethers.utils.toUtf8String(inspect_res.reports[0].payload))
 
       auction_counter = auctions.length;

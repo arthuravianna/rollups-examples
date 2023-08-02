@@ -5,15 +5,33 @@ import "react-datepicker/dist/react-datepicker.css";
 import { isAddress } from "web3-validator";
 import { ethers } from "ethers";
 import { IERC721Portal__factory, IERC721__factory, IInputBox__factory } from "@cartesi/rollups";
+import { useRouter } from 'next/navigation';
 
 
-const inspect_url = "http://localhost:5005/inspect/";
-const erc721PortalAddr = "0x4CA354590EB934E6094Be762b38dE75d1Dd605a9";
-const inputBoxAddr = "0x5a723220579C0DCb8C9253E6b4c62e572E379945";
-const dappAddr = "0x142105FC8dA71191b3a13C738Ba0cF4BC33325e2";
+enum FormStatus {
+    FormReady,
+
+    ApproveFailed,
+    Approving,
+
+    DepositFailed,
+    Depositing,
+
+    AddInputFailed,
+    AddingInput,
+
+    AuctionFailed,
+    CreatingAuction,
+    AuctionCreated
+}
+
+
+function sleep(ms:number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 async function check_erc721_deposit(addr:string, erc721:string, erc721id:number) {
-    let url = `${inspect_url}balance/${addr}`
+    let url = `${process.env.NEXT_PUBLIC_INSPECT_URL}/balance/${addr}`
 
     let response = await fetch(url, {method: 'GET', mode: 'cors',});
     let inspect_res = await response.json();
@@ -28,7 +46,45 @@ async function check_erc721_deposit(addr:string, erc721:string, erc721id:number)
     return true; // the user already deposited the ERC721 token
 }
 
-function waiting(msg:string, step:number) {
+async function check_auction_creation(input_index:number) {
+    let url = `${process.env.NEXT_PUBLIC_GRAPHQL_URL}`;
+    let query = `{"query":"query noticesByInput {input(index: ${input_index}) {notices {edges {node {index input {index} payload}}}}}"}`;
+
+    while (true) {
+        let response = await fetch(url, {method: 'POST', mode: 'cors', headers: {"Content-Type": "application/json"}, body: query});
+        if (!response.ok) {
+            throw Error(`Failed to retrieve info from GRAPHQL (${process.env.NEXT_PUBLIC_GRAPHQL_URL}).`);
+        }
+
+        let notice = await response.json();
+
+        if (!notice.data) {
+            await sleep(200); // "sleep" for 200 ms
+        } else if (notice.data.input.notices.edges.length == 0) {
+            throw Error("Failed to create auction.");
+        } else {
+            const payload_utf8 = ethers.utils.toUtf8String(notice.data.input.notices.edges[0].node.payload);
+            const payload_json = JSON.parse(payload_utf8);
+
+            if (payload_json.type == "auction_create") {
+                const auction_id = payload_json.content.id;
+                return auction_id;
+            }
+        }
+    }
+}
+
+function build_badge_component(status:number, label:string, ongoing:number, error:number) {
+    if (status == error) {
+        return <Badge bg="danger">{label}</Badge>;
+    } else if (status > ongoing) {
+        return <Badge bg="success">{label}</Badge>;
+    }
+
+    return <Badge bg="secondary">{label}</Badge>;
+}
+
+function tx_feedback(msg:string, status:number, spinner:boolean=true) {
     return (
         <div>
             <Stack gap={1} className="mb-2">
@@ -36,24 +92,30 @@ function waiting(msg:string, step:number) {
                     <span>{msg}</span>
                 </div>
 
-                <div className="d-flex justify-content-center">
-                    <Spinner className="my-2" animation="border" variant="secondary"></Spinner>
-                </div>
+                {
+                    spinner?
+                        <div className="d-flex justify-content-center">
+                            <Spinner className="my-2" animation="border" variant="secondary"></Spinner>
+                        </div>
+                    :
+                        <></>
+                }
             </Stack>
 
             <Stack direction="horizontal" gap={3} className="justify-content-center">
-                {step > 0? <Badge bg="success">Approve</Badge>:<Badge bg="secondary">Approve</Badge>}
-                {step > 1? <Badge bg="success">Deposit</Badge>:<Badge bg="secondary">Deposit</Badge>}
-                <Badge bg="secondary">Auction</Badge>
+                {build_badge_component(status, "Approve", FormStatus.Approving, FormStatus.ApproveFailed)}
+                {build_badge_component(status, "Deposit", FormStatus.Depositing, FormStatus.DepositFailed)}
+                {build_badge_component(status, "addInput", FormStatus.AddingInput, FormStatus.AddInputFailed)}
+                {build_badge_component(status, "Auction", FormStatus.CreatingAuction, FormStatus.AuctionFailed)}
             </Stack>
         </div>
     );
 }
 
 export default function AuctionForm({ wallet }: {wallet: any}) {
-    const [waiting_tx, SetWaitingTx] = useState(false);
-    const [waiting_msg, SetWaitingMsg] = useState("");
-    const [formStep, SetFormStep] = useState(0);
+    const [feedback_msg, SetFeedbackMsg] = useState("");
+    const [formStatus, SetFormStatus] = useState(FormStatus.FormReady);
+    const router = useRouter();
 
     // form
     const [auctionTitle, setAuctionTitle] = useState<string>();
@@ -87,23 +149,14 @@ export default function AuctionForm({ wallet }: {wallet: any}) {
     const [auctionEndDate, setAuctionEndDate] = useState<Date>();
 
     function handle_start_date_change(new_date:Date) {
-        if (new_date <= new Date()) {
-            alert("Start Date must be bigger than the current Date!");
-            return;
-        }
         setAuctionStartDate(new_date);
     }
 
     function handle_end_date_change(new_date:Date) {
-        if (auctionStartDate && new_date <= auctionStartDate) {
-            alert("End Date must be bigger than Start Date!");
-            return;
-        }
         setAuctionEndDate(new_date);
     }
 
     async function create_auction() {
-
         if (!wallet) {
             return;
         }
@@ -113,6 +166,16 @@ export default function AuctionForm({ wallet }: {wallet: any}) {
             !auctionMinBidAmount) {
 
             alert("Fill the remaining fields to create an auction.")
+            return;
+        }
+
+        if (auctionStartDate <= new Date()) {
+            alert("Start Date must be bigger than the current Date!");
+            return;
+        }
+
+        if (auctionEndDate <= auctionStartDate) {
+            alert("End Date must be bigger than Start Date!");
             return;
         }
 
@@ -144,36 +207,74 @@ export default function AuctionForm({ wallet }: {wallet: any}) {
 
 
         const signer = new ethers.providers.Web3Provider(wallet.provider, 'any').getSigner();
-        const erc721PortalContract = new ethers.Contract(erc721PortalAddr, IERC721Portal__factory.abi, signer);
-        const inputContract = new ethers.Contract(inputBoxAddr, IInputBox__factory.abi, signer);
+        const erc721PortalContract = new ethers.Contract(process.env.NEXT_PUBLIC_ERC721_PORTAL_ADDR, IERC721Portal__factory.abi, signer);
+        const inputContract = new ethers.Contract(process.env.NEXT_PUBLIC_INPUT_BOX_ADDR, IInputBox__factory.abi, signer);
 
         let deposited = await check_erc721_deposit(wallet.accounts[0].address, erc721, erc721Id);
         if (!deposited) {
-            // Set the ERC721Portal as the new controller
             const erc721Contract = new ethers.Contract(erc721, IERC721__factory.abi, signer);
-            SetFormStep(0);
-            SetWaitingMsg(`Setting the ERC721Portal as the controller of\n ${erc721} - Id: ${erc721Id}.`);
-            SetWaitingTx(true);
-            await erc721Contract.approve(erc721PortalAddr, erc721Id);
 
-            SetFormStep(1);
-            SetWaitingMsg(`Depositing \n ${erc721} - Id: ${erc721Id}.`);
+            // Set the ERC721Portal as the new controller
+            SetFormStatus(FormStatus.Approving);
+            SetFeedbackMsg(`Setting the ERC721Portal as the controller of\n ${erc721} - Id: ${erc721Id}.`);
+            try {
+                let approve = await erc721Contract.approve(process.env.NEXT_PUBLIC_ERC721_PORTAL_ADDR, erc721Id);
+                await approve.wait();
+            } catch (error:any) {
+                SetFormStatus(FormStatus.ApproveFailed);
+                SetFeedbackMsg(error.data.message);
+                return;
+            }
+
+
             // call the deposit method of the Portal Contract to deposit the NFT in the Cartesi DApp
-            let deposit = await erc721PortalContract.depositERC721Token(erc721, dappAddr, erc721Id, "0x", "0x");
-            deposit.wait();
+            SetFormStatus(FormStatus.Depositing);
+            SetFeedbackMsg(`Depositing \n ${erc721} - Id: ${erc721Id}.`);
+            try {
+                let deposit = await erc721PortalContract.depositERC721Token(erc721, process.env.NEXT_PUBLIC_DAPP_ADDR, erc721Id, "0x", "0x");
+                await deposit.wait();
+            } catch (error:any) {
+                SetFormStatus(FormStatus.DepositFailed);
+                SetFeedbackMsg(error.data.message);
+                return;
+            }
         }
 
         // call addInput method of the InputBox Contract to create the auction
-        SetFormStep(2);
-        SetWaitingMsg(`Creating auction for \n ${erc721} - Id: ${erc721Id}.`);
-        inputContract.addInput(dappAddr, ethers.utils.toUtf8Bytes(JSON.stringify(auction))).then(console.log);
+        SetFormStatus(FormStatus.AddingInput);
+        SetFeedbackMsg(`Sending Input to create auction for \n ${erc721} - Id: ${erc721Id}.`);
+        let auction_receipt;
+        try {
+            let input = await inputContract.addInput(process.env.NEXT_PUBLIC_DAPP_ADDR, ethers.utils.toUtf8Bytes(JSON.stringify(auction)));
+            auction_receipt = await input.wait();
+        } catch (error:any) {
+            SetFormStatus(FormStatus.AddInputFailed);
+            SetFeedbackMsg(error.data.message);
+            return;
+        }
 
-        // TODO
         // check if the auction was created then redirect to auction page
+        SetFormStatus(FormStatus.CreatingAuction);
+        SetFeedbackMsg(`Input sent! Checking auction creation on Cartesi Auction DApp.`);
+        try {
+            let auction_id = await check_auction_creation(Number(auction_receipt.events[0].args[1]._hex));
+            SetFormStatus(FormStatus.AuctionCreated);
+
+            await sleep(300);
+            router.push(`/auction/${auction_id}`);
+        } catch (error:any) {
+            SetFormStatus(FormStatus.AuctionFailed);
+            SetFeedbackMsg(error);
+        }
     }
 
-    if (waiting_tx) {
-        return waiting(waiting_msg, formStep);
+    if (formStatus == FormStatus.ApproveFailed || formStatus == FormStatus.DepositFailed ||
+        formStatus == FormStatus.AddInputFailed || formStatus == FormStatus.AuctionFailed) {
+            return tx_feedback(feedback_msg, formStatus, false);
+    }
+
+    if (formStatus != FormStatus.FormReady) {
+        return tx_feedback(feedback_msg, formStatus);
     }
 
     return (

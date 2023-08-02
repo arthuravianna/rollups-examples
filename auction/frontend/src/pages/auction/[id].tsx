@@ -5,8 +5,6 @@ import Header from '@/components/header';
 import { ethers } from "ethers";
 import Auction from '@/components/auction';
 
-const inspect_url = "http://localhost:5005/inspect/";
-
 
 async function process_inspect_call(url: string) {
   let result;
@@ -27,10 +25,10 @@ async function process_inspect_call(url: string) {
 }
 
 async function get_auction(auction_id: number) {
-  let url = `${inspect_url}auctions/${auction_id}`;
+  let url = `${process.env.NEXT_PUBLIC_INSPECT_URL}/auctions/${auction_id}`;
   let auction = await process_inspect_call(url);
 
-  url = `${inspect_url}auctions/${auction_id}/bids`;
+  url = `${process.env.NEXT_PUBLIC_INSPECT_URL}/auctions/${auction_id}/bids`;
   auction.bids = await process_inspect_call(url);
 
   return auction
@@ -41,9 +39,9 @@ export default function AuctionPage() {
   const [auction, setAuction] = useState(undefined);
 
   useEffect(() => {
-    if (router.isReady) {
-      console.log("ROUTER READY!!!");
-      get_auction(router.query.id)
+    if (router.isReady && router.query.id) {
+      let auction_id = parseInt(typeof router.query.id == "string"? router.query.id: router.query.id[0]);
+      get_auction(auction_id)
       .then((result) => {
         setAuction(result);
       });

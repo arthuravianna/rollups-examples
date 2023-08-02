@@ -9,16 +9,13 @@ import { useEffect, useState } from 'react';
 import { IInputBox__factory } from '@cartesi/rollups';
 
 
-const inspect_url = "http://localhost:5005/inspect/";
-const inputBoxAddr = "0x5a723220579C0DCb8C9253E6b4c62e572E379945";
 const dappAddr = "0x142105FC8dA71191b3a13C738Ba0cF4BC33325e2";
 
 async function get_l2_balance(addr:string, erc20:string) {
-    let url = `${inspect_url}balance/${addr}`
+    let url = `${process.env.NEXT_PUBLIC_INSPECT_URL}/balance/${addr}`
 
     let inspect_res = (await fetch(url, {method: 'GET',mode: 'cors'}));
     let inspect_json = await inspect_res.json();
-    //let inspect_json = JSON.parse(inspect_res_str);
     let balances = JSON.parse(ethers.utils.toUtf8String(inspect_json.reports[0].payload));
 
     if (balances.erc20 === undefined) {
@@ -106,7 +103,7 @@ export default function Auction({auction}: {auction: any}) {
         if (!wallet || !bid_amount) return;
 
         const signer = new ethers.providers.Web3Provider(wallet.provider, 'any').getSigner();
-        const inputContract = new ethers.Contract(inputBoxAddr, IInputBox__factory.abi, signer);
+        const inputContract = new ethers.Contract(process.env.NEXT_PUBLIC_INPUT_BOX_ADDR, IInputBox__factory.abi, signer);
         inputContract.addInput(dappAddr, ethers.utils.toUtf8Bytes(JSON.stringify(bid))).then(console.log);
     }
 
