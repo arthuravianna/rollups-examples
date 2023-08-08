@@ -6,6 +6,7 @@ import Button from 'react-bootstrap/Button';
 import Spinner from 'react-bootstrap/Spinner';
 import { ChevronDoubleRight, ChevronDoubleLeft } from 'react-bootstrap-icons';
 import { ethers } from "ethers";
+import { Auction } from "./auction";
 
 const loading_auction_list = <div className="d-flex justify-content-center">
   <Spinner className="my-2" animation="border" variant="dark">
@@ -29,9 +30,9 @@ function build_auction_list(offset: number, setFunction: Function) {
 
       setFunction(
         <Row md={3}>
-          {auctions.map((auction: any) => {
+          {auctions.map((auction: Auction) => {
             return (
-              <Col key={auction.id}>
+              <Col key={auction?.id}>
                 <AuctionCard auction={auction} clickable={true}></AuctionCard>
               </Col>
             )

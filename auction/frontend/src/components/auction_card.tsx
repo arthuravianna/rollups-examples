@@ -2,26 +2,15 @@ import { useRouter } from 'next/router';
 import Card from 'react-bootstrap/Card';
 import Table from 'react-bootstrap/Table';
 import { HourglassTop, HourglassSplit, HourglassBottom } from 'react-bootstrap-icons';
+import { Auction } from './auction';
 
 
-interface AuctionInterface {
-    id: number,
-    state: number, // Created = 0, Started = 1, Finished = 2
-    item: {erc721: string, token_id: number},
-    erc20: string,
-    title: string,
-    description: string,
-    start_date: number,
-    end_date: number,
-    min_bid_amount: number,
-    //bids: Array<BidInterface>
-}
 
-export default function AuctionCard({auction, clickable}: {auction: AuctionInterface, clickable:boolean}) {
+export default function AuctionCard({auction, clickable}: {auction: Auction, clickable:boolean}) {
   if (!auction) {
     return;
   }
-  
+
   const router = useRouter()
   let status_icon;
   let card_class = "m-2";
@@ -36,7 +25,7 @@ export default function AuctionCard({auction, clickable}: {auction: AuctionInter
       })
     }
   }
-  
+
   let highest_bid_author = "No one made a bid yet";
   let highest_bid = 0;
   let highest_bid_timestamp = "";

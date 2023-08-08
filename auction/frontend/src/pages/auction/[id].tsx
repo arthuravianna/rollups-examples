@@ -36,7 +36,7 @@ async function get_auction(auction_id: number) {
 
 export default function AuctionPage() {
   const router = useRouter();
-  const [auction, setAuction] = useState(undefined);
+  const [auction, setAuction] = useState(null);
 
   useEffect(() => {
     if (router.isReady && router.query.id) {

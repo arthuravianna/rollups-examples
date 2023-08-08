@@ -189,6 +189,11 @@ export default function AuctionForm({ wallet }: {wallet: any}) {
             return;
         }
 
+        if (!(process.env.NEXT_PUBLIC_ERC721_PORTAL_ADDR && process.env.NEXT_PUBLIC_INPUT_BOX_ADDR)) {
+            console.log("Missing ERC721Portal address and/or InputBox address in the .env file");
+            return;
+        }
+
         let auction = {
             "method": "create",
             "args": {
